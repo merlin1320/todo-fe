@@ -1,0 +1,16 @@
+    /*
+      Reset default CSS so that App fills page
+      and is in full control of style
+    */
+    html,
+    body,
+    #root {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+
