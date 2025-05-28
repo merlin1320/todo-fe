@@ -1,11 +1,13 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
 import "./index.css";
-import axios from "axios";
 
 const baseURL = "https://gtnjqqxk-3050.usw2.devtunnels.ms";
 
 type Todo = {
   id: number;
+  title: string;
+  author: string;
   description: string;
   completed: boolean;
 };
@@ -15,9 +17,15 @@ function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedTodo, setSelectedTodo] = useState<Todo>({} as Todo);
-  const [newTodo, setNewTodo] = useState<Todo>({} as Todo);
+  const [newTodo, setNewTodo] = useState({
+    title: "",
+    author: "",
+    description: "",
+  });
 
-  useEffect(() => {
+  useEffect(() => {fetchTodos()}, []);
+
+  const fetchTodos = async () => {
     axios
       .get(`${baseURL}/todos`)
       .then((response) => {
@@ -26,10 +34,15 @@ function App() {
       .catch((error) => {
         console.error(error);
       });
-  }, []);
+  };
 
-  const handleEdit = (todo: Todo) => {
+  const handleEditClcik = (todo: Todo) => {
     setSelectedTodo(todo);
+    setNewTodo({
+      title: todo.title,
+      description: todo.description,
+      author: todo.author,
+    })
     setModalOpen(true);
   };
 
@@ -41,17 +54,25 @@ function App() {
     setAddModalOpen(false);
   };
 
-  const handleChange = (event) => {
-    setNewTodo({...newTodo, description: event.target.value})
-  }
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setNewTodo((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleAddTodo = async () => {
-    console.log(newTodo.description);
-    
-    setAddModalOpen(true)
+    const newTodos = { ...newTodo };
+
+    setAddModalOpen(true);
     try {
-      await axios.post(`${baseURL}/todos`, {
-        data: { description: newTodo.description },
+      await axios.post(`${baseURL}/todos`, newTodos).then((response) => {
+        console.log("todo added:", response.data);
+        setNewTodo({
+          title: "",
+          author: "",
+          description: "",
+        });
       });
       setAddModalOpen(false);
       const res = await axios.get(baseURL + "/todos");
@@ -61,21 +82,10 @@ function App() {
     }
   };
 
-  const handleDelete = async (todo: Todo) => {
-    try {
-      await axios.delete(`${baseURL}/todos`, { data: { id: todo.id } });
-      const res = await axios.get(baseURL + "/todos");
-      setTodos(res.data);
-    } catch (error) {
-      console.error("Error deleting: ", error);
-    }
-  };
-
   const modalSave = async () => {
     if (!selectedTodo) return;
     try {
-      console.log("Get above the patch");
-      await axios.patch(`${baseURL}/todos`, { id: selectedTodo.id });
+      await axios.patch(`${baseURL}/todos/${selectedTodo.id}`, newTodo);
       setModalOpen(false);
       setSelectedTodo({} as Todo);
       const res = await axios.get(baseURL + "/todos");
@@ -85,15 +95,40 @@ function App() {
     }
   };
 
+  const handleDelete = async (todo: Todo) => {
+    console.log("Todo ID: ", todo.id);
+    try {
+      await axios.delete(`${baseURL}/todos/${todo.id}`).then((response) => {
+        console.log("Todo deleted", response.data);
+      });
+      const res = await axios.get(baseURL + "/todos");
+      setTodos(res.data);
+    } catch (error) {
+      console.error("Error deleting: ", error);
+    }
+  };
+
+  const toggleComplete = async (todo: Todo) => {
+    await axios.patch(`${baseURL}/todos/${todo.id}`).then(() => {
+      console.log(
+        todo.completed ? "Todo marked Completed " : "Todo marked Incomplete"
+      );
+    });
+    const res = await axios.get(baseURL + "/todos");
+    setTodos(res.data);
+  };
+
   return (
     <>
-      <div style={{flex:1, justifyContent:'center', alignContent:'center'}}>
+      <div style={{ flex: 1, justifyItems: "center", alignContent: "center" }}>
         <button onClick={() => setAddModalOpen(true)}>Add Todo</button>
         <table>
           <thead>
             <tr>
               <th>Edit Todo</th>
+              <th>Todo Title</th>
               <th>Todo Descirption</th>
+              <th>Todo Author</th>
               <th>Completed</th>
               <th>Delete</th>
             </tr>
@@ -102,10 +137,22 @@ function App() {
             {todos.map((todo) => (
               <tr key={todo.id}>
                 <td>
-                  <button onClick={() => handleEdit(todo)}>Edit todo</button>
+                  <button onClick={() => handleEditClcik(todo)}>Edit todo</button>
                 </td>
+                <td>{todo.title}</td>
                 <td>{todo.description}</td>
-                <td>{todo.completed}</td>
+                <td>{todo.author}</td>
+                <td>
+                  {todo.completed ? (
+                    <button onClick={() => toggleComplete(todo)}>
+                      Mark as Incomplete
+                    </button>
+                  ) : (
+                    <button onClick={() => toggleComplete(todo)}>
+                      Mark as Complete
+                    </button>
+                  )}
+                </td>
                 <td>
                   <button onClick={() => handleDelete(todo)}>
                     Delete Todo
@@ -149,11 +196,12 @@ function App() {
                 style={{ display: "flex", flexDirection: "column", gap: 16 }}
               >
                 <label style={{ color: "#fff" }}>
-                  Name:
+                  Title:
                   <input
-                    name="name"
-                    value={selectedTodo.description}
-                    disabled
+                    name="title"
+                    type="text"
+                    value={newTodo.title}
+                    onChange={handleInputChange}
                     style={{
                       background: "#222",
                       color: "#fff",
@@ -163,17 +211,33 @@ function App() {
                   />
                 </label>
                 <label style={{ color: "#fff" }}>
-                  Completed:
+                  Description:
                   <input
-                    type="checkbox"
-                    checked={selectedTodo.completed}
-                    onChange={(e) =>
-                      setSelectedTodo({
-                        ...selectedTodo,
-                        completed: e.target.checked,
-                      })
-                    }
-                    style={{ marginLeft: 8 }}
+                    name="description"
+                    type="text"
+                    value={newTodo.description}
+                    onChange={handleInputChange}
+                    style={{
+                      background: "#222",
+                      color: "#fff",
+                      border: "1px solid #444",
+                      marginLeft: 8,
+                    }}
+                  />
+                </label>
+                <label style={{ color: "#fff" }}>
+                  Author:
+                  <input
+                    name="author"
+                    type="text"
+                    value={newTodo.author}
+                    onChange={handleInputChange}
+                    style={{
+                      background: "#222",
+                      color: "#fff",
+                      border: "1px solid #444",
+                      marginLeft: 8,
+                    }}
                   />
                 </label>
                 <div>
@@ -207,8 +271,9 @@ function App() {
             </div>
           </div>
         )}
+
         {addModalOpen && newTodo && (
-           <div
+          <div
             style={{
               position: "fixed",
               top: 0,
@@ -241,12 +306,12 @@ function App() {
                 style={{ display: "flex", flexDirection: "column", gap: 16 }}
               >
                 <label style={{ color: "#fff" }}>
-                  Description:
+                  Title:
                   <input
-                    name="description"
+                    name="title"
                     type="text"
-                    value={newTodo.description}
-                    onChange={(e) => handleChange(e)}
+                    value={newTodo.title}
+                    onChange={handleInputChange}
                     style={{
                       background: "#222",
                       color: "#fff",
@@ -256,19 +321,44 @@ function App() {
                   />
                 </label>
                 <label style={{ color: "#fff" }}>
+                  Description:
+                  <input
+                    name="description"
+                    type="text"
+                    value={newTodo.description}
+                    onChange={handleInputChange}
+                    style={{
+                      background: "#222",
+                      color: "#fff",
+                      border: "1px solid #444",
+                      marginLeft: 8,
+                    }}
+                  />
+                </label>
+                <label style={{ color: "#fff" }}>
+                  Author:
+                  <input
+                    name="author"
+                    type="text"
+                    value={newTodo.author}
+                    onChange={handleInputChange}
+                    style={{
+                      background: "#222",
+                      color: "#fff",
+                      border: "1px solid #444",
+                      marginLeft: 8,
+                    }}
+                  />
+                </label>
+                {/* <label style={{ color: "#fff" }}>
                   Completed:
                   <input
                     type="checkbox"
                     checked={newTodo.completed}
-                    onChange={(e) =>
-                      setNewTodo({
-                        ...newTodo,
-                        completed: e.target.checked,
-                      })
-                    }
+                    onChange={handleInputChange}
                     style={{ marginLeft: 8 }}
                   />
-                </label>
+                </label> */}
                 <div>
                   <button
                     onClick={handleAddModalClose}
