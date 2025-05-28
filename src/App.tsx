@@ -96,7 +96,6 @@ function App() {
   };
 
   const handleDelete = async (todo: Todo) => {
-    console.log("Todo ID: ", todo.id);
     try {
       await axios.delete(`${baseURL}/todos/${todo.id}`).then((response) => {
         console.log("Todo deleted", response.data);
